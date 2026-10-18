@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04101a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="NULLMAP">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>NULLMAP</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{--bg:#04101a;--panel:rgba(7,28,41,.9);--c:#27e6ff;--dim:#0e5f73;--ink:#bff6ff;--warn:#ff4d6d;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:'Rajdhani',system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
+#map{position:fixed;inset:0;background:var(--bg)}
+.leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.75) contrast(1.35) sepia(1) hue-rotate(150deg) saturate(4)}
+.leaflet-bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 170px)}
+.leaflet-control-attribution{background:rgba(4,16,26,.8)!important;color:#5fb6c7!important;font-size:10px}
+.leaflet-control-attribution a{color:var(--c)!important}
+.me{width:26px;height:26px;transition:transform .3s linear}
+.dst{width:18px;height:18px;border:2px solid var(--warn);box-shadow:0 0 10px var(--warn);background:rgba(255,77,109,.2)}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+.top{position:fixed;left:14px;right:14px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:1000;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.top h1{margin:0;font-size:28px;font-weight:700;color:var(--c);letter-spacing:.02em;text-shadow:2px 0 var(--dim),-2px 0 var(--c),0 0 8px var(--bg)}
+.chip{padding:5px 14px;background:var(--panel);color:var(--c);font-weight:700;font-size:15px;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%)}
+.search{position:fixed;left:14px;right:14px;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:1000;display:flex;gap:6px}
+.search input{flex:1;min-width:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;background:var(--panel);color:var(--ink);border:1px solid var(--dim);padding:11px;border-radius:0;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.search button{min-width:58px;font-size:18px;font-weight:700;background:var(--panel);color:var(--c);border:1px solid var(--dim)}
+.tools{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px}
+.tools button{width:62px;min-height:48px;font-size:17px;font-weight:700;border:1px solid var(--dim);background:var(--panel);color:var(--c);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.tools button.on{background:var(--c);color:var(--bg);border-color:var(--c)}
+.card{position:fixed;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:1000;padding:14px 14px 10px;background:var(--panel);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);clip-path:polygon(0 16px,16px 0,100% 0,100% 100%,0 100%);display:flex;flex-direction:column;gap:6px}
+.card:before{content:"";position:absolute;left:16px;right:0;top:0;height:3px;background:var(--c)}
+#pl{color:#7fc4d3;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mid{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.big{display:flex;align-items:baseline;gap:12px}
+#dd{font-size:44px;font-weight:700;line-height:1;color:var(--c)}
+#dt{font-size:26px;font-weight:500;color:var(--ink)}
+.go{min-width:132px;min-height:50px;font-size:20px;font-weight:700;border:0;background:var(--c);color:var(--bg);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+.rd,#log{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#7fc4d3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#log{min-height:14px;color:#6fcbdc}
+#log.w{color:var(--warn)}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="top"><h1>NULLMAP</h1><span class="chip" id="gs">gps off</span></div>
+<form id="f" class="search"><input id="i" placeholder="buscar lugar, ej: plaza de armas quilpue" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="submit">ir</button></form>
+<div class="tools">
+  <button id="bw" class="on" type="button">a pie</button>
+  <button id="ba" type="button">auto</button>
+  <button id="loc" type="button">yo</button>
+</div>
+<div class="card">
+  <div id="pl">Toca el mapa o busca un lugar</div>
+  <div class="mid"><div class="big"><span id="dd">--</span><span id="dt"></span></div><button class="go" id="go" type="button">iniciar ruta</button></div>
+  <div class="rd" id="rd">vel 0 km/h | rumbo -- | prec --</div>
+  <div id="log"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const map=L.map('map',{zoomControl:false}).setView([-33.045,-71.41],13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+
+const S={mode:'walk',me:null,dest:null,route:null,follow:false,watch:null,pos:null,v:0,h:null,p:null};
+const API={walk:'https://routing.openstreetmap.de/routed-foot/route/v1/driving/',auto:'https://routing.openstreetmap.de/routed-car/route/v1/driving/'};
+
+function log(t,w){const l=$('log');l.textContent='> '+t;l.className=w?'w':''}
+const fmt=m=>m>=1000?(m/1000).toFixed(1).replace('.',',')+' km':Math.round(m)+' m';
+const fmtT=s=>s<90?Math.round(s)+' s':s<5400?Math.round(s/60)+' min':(s/3600).toFixed(1).replace('.',',')+' h';
+function hud(){$('rd').textContent='vel '+Math.round(S.v*3.6)+' km/h | rumbo '+(S.h!=null?Math.round(S.h)+'\u00b0':'--')+' | prec '+(S.p!=null?'\u00b1'+Math.round(S.p)+' m':'--')}
+
+const meIcon=L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],
+  html:'<svg id="arrow" class="me" viewBox="0 0 26 26"><path d="M13 2 L22 23 L13 18 L4 23 Z" fill="#27e6ff" stroke="#bff6ff" stroke-width="1" style="filter:drop-shadow(0 0 6px #27e6ff)"/></svg>'});
+const dstIcon=L.divIcon({className:'',iconSize:[18,18],iconAnchor:[9,9],html:'<div class="dst"></div>'});
+
+function setMode(m){S.mode=m;$('bw').classList.toggle('on',m==='walk');$('ba').classList.toggle('on',m==='auto');log('modo: '+(m==='walk'?'a pie':'auto'));if(S.dest)routeTo(S.dest)}
+$('bw').onclick=()=>setMode('walk');$('ba').onclick=()=>setMode('auto');
+
+function startGPS(){
+  if(!navigator.geolocation){log('este dispositivo no tiene gps',1);return}
+  if(S.watch!==null){S.follow=true;if(S.pos)map.setView(S.pos,Math.max(map.getZoom(),16));return}
+  log('pidiendo ubicacion...');
+  S.watch=navigator.geolocation.watchPosition(p=>{
+    const c=p.coords,ll=[c.latitude,c.longitude];S.pos=ll;
+    if(!S.me){S.me=L.marker(ll,{icon:meIcon,interactive:false,zIndexOffset:1000}).addTo(map);S.follow=true;map.setView(ll,16);$('gs').textContent='gps ok';log('gps conectado');if(S.dest)routeTo(S.dest)}
+    else S.me.setLatLng(ll);
+    if(c.heading!=null&&!isNaN(c.heading)){S.h=c.heading;const a=$('arrow');if(a)a.style.transform='rotate('+c.heading+'deg)'}
+    S.v=c.speed||0;S.p=c.accuracy;hud();
+    if(S.follow)map.panTo(ll,{animate:true});
+    if(S.dest&&!S._busy&&(!S._last||Date.now()-S._last>15000))routeTo(S.dest);
+  },e=>{S.watch=null;$('gs').textContent='gps off';log('sin gps: '+e.message,1)},{enableHighAccuracy:true,maximumAge:1000});
+}
+map.on('dragstart',()=>{S.follow=false});
+$('loc').onclick=startGPS;
+
+async function routeTo(d,name){
+  S.dest=d;
+  if(name)$('pl').textContent=name;else if(!S._named)$('pl').textContent='Destino fijado en el mapa';
+  if(S.destMarker)S.destMarker.setLatLng(d);else S.destMarker=L.marker(d,{icon:dstIcon,interactive:false}).addTo(map);
+  if(!S.pos){log('toca iniciar ruta para activar el gps',1);return}
+  S._busy=true;S._last=Date.now();
+  try{
+    const u=API[S.mode]+S.pos[1]+','+S.pos[0]+';'+d[1]+','+d[0]+'?overview=full&geometries=geojson';
+    const r=await fetch(u),j=await r.json();
+    if(!j.routes||!j.routes.length)throw new Error('sin ruta');
+    const rt=j.routes[0];
+    if(S.route)map.removeLayer(S.route);
+    S.route=L.geoJSON(rt.geometry,{style:{color:'#27e6ff',weight:5,opacity:.95,dashArray:'10 8'}}).addTo(map);
+    $('dd').textContent=fmt(rt.distance);$('dt').textContent=fmtT(rt.duration);
+  }catch(e){log('no pude calcular la ruta: '+e.message,1)}
+  S._busy=false;
+}
+map.on('click',e=>{S._named=false;routeTo([e.latlng.lat,e.latlng.lng])});
+
+async function ir(q){
+  log('buscando: '+q);
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&viewbox=-71.75,-32.85,-71.25,-33.2&q='+encodeURIComponent(q));
+    const j=await r.json();
+    if(!j.length){log('no encontre ese lugar',1);return}
+    const d=[+j[0].lat,+j[0].lon],nm=j[0].display_name.split(',').slice(0,2).join(',');
+    map.setView(d,16);S.follow=false;S._named=true;routeTo(d,nm);log('encontrado');
+  }catch(e){log('fallo la busqueda: '+e.message,1)}
+}
+function clear(){S.dest=null;if(S.route){map.removeLayer(S.route);S.route=null}if(S.destMarker){map.removeLayer(S.destMarker);S.destMarker=null}$('dd').textContent='--';$('dt').textContent='';$('pl').textContent='Toca el mapa o busca un lugar';log('destino borrado')}
+
+$('go').onclick=()=>{if(!S.dest)log('fija un destino: toca el mapa o busca un lugar',1);startGPS();if(S.dest&&S.pos)routeTo(S.dest)};
+$('f').onsubmit=e=>{e.preventDefault();const t=$('i').value.trim();$('i').value='';if(!t)return;
+  const c=t.toLowerCase();
+  if(c==='/a pie')setMode('walk');
+  else if(c==='/auto')setMode('auto');
+  else if(c==='/gps')startGPS();
+  else if(c==='/limpiar')clear();
+  else if(c==='/ayuda')log('/a pie /auto /gps /limpiar o escribe un lugar');
+  else ir(t.replace(/^\/ir\s+/i,''))};
+log('listo. Busca un lugar o toca el mapa.');
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+</script>
+</body>
+</html>
