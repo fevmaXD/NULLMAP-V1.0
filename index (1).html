@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLAN_TRACE alfa</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;700&display=swap">
+<style>
+:root{--g:#39ff6a;--l:#d4ff3b;--bg:#020a04;--pn:#06150a;--dim:#8fd9a0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--g);font-family:'Share Tech Mono',monospace}
+#map{position:absolute;inset:0;background:var(--bg)}
+.leaflet-tile-pane{filter:grayscale(1) invert(1) sepia(1) hue-rotate(75deg) saturate(3) brightness(.85) contrast(1.15)}
+.leaflet-control-attribution{background:#020a04cc!important;color:var(--dim)!important;font-size:9px}
+.leaflet-control-attribution a{color:var(--dim)!important}
+.leaflet-control-zoom{display:none}
+.ui{position:absolute;z-index:1100}
+#top{top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center}
+.logo{background:var(--g);color:var(--bg);padding:9px 20px 9px 14px;font-family:'Chakra Petch',sans-serif;font-weight:700;letter-spacing:3px;clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%)}
+.tag{font-size:12px;color:var(--l);border:1px solid var(--l);padding:6px 10px;background:#020a04ee}
+#near{top:calc(env(safe-area-inset-top,0px) + 64px);left:12px;background:#020a04f2;border:1px solid var(--l);padding:10px 14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%)}
+#near small{display:block;font-size:11px;color:var(--dim)}
+#near b{font-size:22px;color:var(--l);font-weight:400}
+#panel{left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+.code{background:var(--pn);border:2px solid var(--g);padding:14px;display:flex;justify-content:space-between;align-items:center;clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px))}
+.code small{font-size:11px;color:var(--dim);letter-spacing:2px}
+#code{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:28px;color:var(--l);letter-spacing:3px}
+#qr{width:60px;height:60px;background:var(--g);padding:3px}
+#qr img,#qr canvas{width:100%!important;height:100%!important}
+.row{display:flex;justify-content:space-between;border-left:3px solid var(--g);padding:5px 12px;background:var(--pn);margin-top:6px;font-size:15px}
+button{width:100%;min-height:52px;margin-top:10px;background:var(--g);color:var(--bg);border:0;font-family:'Chakra Petch',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%)}
+#msg{font-size:11px;color:var(--dim);margin-top:6px;min-height:14px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top" class="ui"><div class="logo">CLAN_TRACE</div><div class="tag">ALFA 0.1</div></div>
+<div id="near" class="ui"><small>&gt; MAS CERCANO</small><b id="nearv">--</b></div>
+<div id="panel" class="ui">
+  <div class="code"><div><small>&gt; CODIGO DE GRUPO</small><div id="code">NM-----</div></div><div id="qr" aria-label="Codigo QR del grupo" role="img"></div></div>
+  <div id="list"></div>
+  <div id="msg">&gt; buscando GPS...</div>
+  <button id="join">+ UNIRSE CON CODIGO</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function(){
+  var CENTER=[-33.045,-71.44];
+  var map=L.map('map',{zoomControl:false}).setView(CENTER,14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+
+  // codigo de grupo guardado en el telefono
+  function newCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',s='NM-';for(var i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+  var code=null;
+  try{code=localStorage.getItem('nm_code');}catch(e){}
+  if(!code){code=newCode();try{localStorage.setItem('nm_code',code);}catch(e){}}
+  var qrEl=document.getElementById('qr');
+  function drawCode(){
+    document.getElementById('code').textContent=code;
+    qrEl.innerHTML='';
+    try{new QRCode(qrEl,{text:code,width:54,height:54,colorDark:'#020a04',colorLight:'#39ff6a'});}catch(e){}
+  }
+  drawCode();
+
+  // yo + miembros DEMO (se reemplazan por personas reales cuando agreguemos servidor)
+  var me=null,meMarker=null;
+  var demo=[{n:'PAPA',dy:0.010,dx:-0.006},{n:'MAMA',dy:-0.020,dx:0.012},{n:'HERMANO',dy:0.045,dx:0.030}];
+  var markers=[];
+  function icon(t){return L.divIcon({className:'',html:'<div style="color:#d4ff3b;font:11px monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4ff3b;margin-right:4px"></span>'+t+'</div>',iconSize:[70,14],iconAnchor:[5,7]});}
+  function km(m){return (m/1000).toFixed(1)+' km';}
+  function refresh(){
+    var base=me||L.latLng(CENTER),rows='',best=null;
+    demo.forEach(function(d,i){
+      var p=L.latLng(base.lat+d.dy,base.lng+d.dx);
+      if(!markers[i])markers[i]=L.marker(p,{icon:icon(d.n)}).addTo(map);else markers[i].setLatLng(p);
+      var dist=me?me.distanceTo(p):null;
+      rows+='<div class="row"><span>&gt; '+d.n+' (demo)</span><span>'+(dist==null?'--':km(dist))+'</span></div>';
+      if(dist!=null&&(!best||dist<best.d))best={n:d.n,d:dist};
+    });
+    document.getElementById('list').innerHTML=rows;
+    document.getElementById('nearv').textContent=best?best.n+' '+km(best.d):'--';
+  }
+  refresh();
+
+  var first=true;
+  if(navigator.geolocation){
+    navigator.geolocation.watchPosition(function(pos){
+      me=L.latLng(pos.coords.latitude,pos.coords.longitude);
+      if(!meMarker)meMarker=L.circleMarker(me,{radius:8,color:'#39ff6a',fillColor:'#39ff6a',fillOpacity:1,weight:3}).addTo(map);else meMarker.setLatLng(me);
+      if(first){map.setView(me,15);first=false;}
+      document.getElementById('msg').textContent='> GPS ok (±'+Math.round(pos.coords.accuracy)+' m)';
+      refresh();
+    },function(){document.getElementById('msg').textContent='> GPS bloqueado: permite la ubicacion en el navegador';},{enableHighAccuracy:true,maximumAge:5000});
+  }else{document.getElementById('msg').textContent='> este navegador no tiene GPS';}
+
+  document.getElementById('join').onclick=function(){
+    var c=(prompt('Escribe el codigo del grupo (ej: NM-7K2P)')||'').trim().toUpperCase();
+    if(!/^NM-[A-Z0-9]{4}$/.test(c)){if(c)document.getElementById('msg').textContent='> codigo invalido';return;}
+    code=c;try{localStorage.setItem('nm_code',code);}catch(e){}
+    drawCode();
+    document.getElementById('msg').textContent='> grupo '+c+' guardado. Falta el servidor para ver a otros en vivo';
+  };
+})();
+</script>
+</body>
+</html>
